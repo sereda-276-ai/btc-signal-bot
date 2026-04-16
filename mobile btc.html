@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0e11">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BTC Signal Bot">
+  
+  <title>📈 BTC Signal Bot</title>
+  
+  <!-- PWA Manifest (встроенный) -->
+  <link rel="manifest" href="data:application/json;base64,eyJ7Im5hbWUiOiJCVEMgU2lnbmFsIEJvdCIsInNob3J0X25hbWUiOiJCVENCb3QiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBiMGUxMSIsInRoZW1lX2NvbG9yIjoiIzBiMGUxMSIsImljb25zIjpbeyJzcmMiOiJodHRwczovL2Vtb2ppLmlvL3R3YXAvYnVibGUvY2hhcnQtd2l0aC1kb2xsaW5lLXNpZ24ucG5nIiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyJ9XX0=">
+  
+  <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+  
+  <style>
+    :root {
+      --bg: #0b0e11;
+      --card: #151a21;
+      --border: #2a313a;
+      --text: #c5ccd5;
+      --green: #00c853;
+      --red: #ff3d00;
+      --blue: #2979ff;
+      --yellow: #ffd600;
+      --safe-top: env(safe-area-inset-top);
+      --safe-bottom: env(safe-area-inset-bottom);
+    }
+    
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      font-size: 14px;
+      touch-action: manipulation;
+    }
+    
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      padding: constant(safe-area-inset-top) constant(safe-area-inset-right) constant(safe-area-inset-bottom) constant(safe-area-inset-left);
+      padding: var(--safe-top) 10px var(--safe-bottom) 10px;
+    }
+    
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 4px;
+      background: var(--card);
+      border-radius: 12px;
+      margin-bottom: 8px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 1em;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .price-box {
+      font-size: 1.4em;
+      font-weight: bold;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+    }
+    .price-up { color: var(--green); }
+    .price-down { color: var(--red); }
+    
+    /* Status */
+    .status {
+      text-align: center;
+      font-size: 0.75em;
+      color: #8b949e;
+      margin: 2px 0 6px;
+      padding: 4px;
+      background: rgba(42,49,58,0.5);
+      border-radius: 6px;
+    }
+    
+    /* Signal Box - крупный и заметный */
+    .signal-box {
+      text-align: center;
+      padding: 14px 10px;
+      border-radius: 12px;
+      font-size: 1.1em;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: var(--card);
+      border: 2px solid var(--border);
+      transition: all 0.3s ease;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.95; }
+    }
+    .signal-box.LONG {
+      background: rgba(0,200,83,0.15);
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: 0 0 20px rgba(0,200,83,0.3);
+      animation: glow-green 1.5s infinite alternate;
+    }
+    .signal-box.SHORT {
+      background: rgba(255,61,0,0.15);
+      border-color: var(--red);
+      color: var(--red);
+      box-shadow: 0 0 20px rgba(255,61,0,0.3);
+      animation: glow-red 1.5s infinite alternate;
+    }
+    @keyframes glow-green { from { box-shadow: 0 0 10px rgba(0,200,83,0.2); } to { box-shadow: 0 0 25px rgba(0,200,83,0.5); } }
+    @keyframes glow-red { from { box-shadow: 0 0 10px rgba(255,61,0,0.2); } to { box-shadow: 0 0 25px rgba(255,61,0,0.5); } }
+    .signal-box.WAIT {
+      background: var(--card);
+      color: #8b949e;
+      animation: none;
+    }
+    
+    /* Chart */
+    #chart {
+      flex: 1;
+      min-height: 220px;
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin: 4px 0;
+      width: 100%;
+    }
+    
+    /* Info Panel */
+    .panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 6px 0;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .card h3 {
+      margin: 0 0 6px;
+      font-size: 0.8em;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin: 3px 0;
+      font-size: 0.95em;
+    }
+    .val {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: #fff;
+    }
+    .sl { color: var(--red); }
+    .tp { color: var(--green); }
+    
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin: 6px 0;
+    }
+    .btn {
+      flex: 1;
+      padding: 10px 8px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85em;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+      background: var(--blue);
+      transition: transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-sound.active { background: var(--green); }
+    .btn-install { background: var(--yellow); color: #000; }
+    
+    /* Log */
+    .log-title {
+      font-size: 0.85em;
+      color: #8b949e;
+      margin: 8px 0 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .log-title button {
+      background: none;
+      border: none;
+      color: var(--blue);
+      font-size: 0.8em;
+      padding: 0;
+      cursor: pointer;
+    }
+    #log {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      max-height: 120px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.75em;
+      line-height: 1.4;
+    }
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px dashed #2a313a;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-signal { font-weight: bold; }
+    .log-details { color: #8b949e; font-size: 0.9em; }
+    
+    /* Footer */
+    .footer {
+      text-align: center;
+      font-size: 0.7em;
+      color: #555;
+      margin-top: 4px;
+      padding: 6px;
+      background: rgba(26,26,26,0.5);
+      border-radius: 8px;
+    }
+    
+    /* Install Banner */
+    .install-banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 12px;
+      display: none;
+      z-index: 100;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .install-banner.show { display: flex; align-items: center; gap: 10px; }
+    .install-banner button {
+      background: var(--green);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .install-banner .close {
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 1.2em;
+      padding: 0;
+      margin-left: auto;
+    }
+    
+    /* Scrollbar для лога */
+    #log::-webkit-scrollbar { width: 4px; }
+    #log::-webkit-scrollbar-track { background: var(--bg); }
+    #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    
+    /* Адаптив для очень маленьких экранов */
+    @media (max-height: 600px) {
+      #chart { min-height: 180px; }
+      .panel { grid-template-columns: 1fr; }
+      .header h1 { font-size: 0.9em; }
+      .price-box { font-size: 1.2em; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <div class="header">
+      <h1>📈 BTC/USDT 5M</h1>
+      <div class="price-box" id="price">—</div>
+    </div>
+    
+    <!-- Status -->
+    <div class="status" id="status">⏳ Подключение...</div>
+    
+    <!-- Signal Box -->
+    <div class="signal-box WAIT" id="signalBox">🟡 ОЖИДАНИЕ СИГНАЛА</div>
+    
+    <!-- Chart -->
+    <div id="chart"></div>
+    
+    <!-- Info Panel -->
+    <div class="panel">
+      <div class="card">
+        <h3>📊 Индикаторы</h3>
+        <div class="row"><span>EMA9:</span> <span id="ema9" class="val">—</span></div>
+        <div class="row"><span>EMA21:</span> <span id="ema21" class="val">—</span></div>
+        <div class="row"><span>RSI:</span> <span id="rsi" class="val">—</span></div>
+      </div>
+      <div class="card">
+        <h3>🎯 Сделка</h3>
+        <div class="row"><span>Вход:</span> <span id="entry" class="val">—</span></div>
+        <div class="row"><span class="sl">SL:</span> <span id="sl" class="val">—</span></div>
+        <div class="row"><span class="tp">TP:</span> <span id="tp" class="val">—</span></div>
+      </div>
+    </div>
+    
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-sound" id="soundBtn" onclick="toggleSound()">🔔 Звук</button>
+      <button class="btn btn-install" id="installBtn" onclick="installApp()" style="display:none">📲 Установить</button>
+      <button class="btn" onclick="clearLog()">🗑️ Очистить</button>
+    </div>
+    
+    <!-- Log -->
+    <div class="log-title">
+      <span>📜 Журнал</span>
+      <button onclick="exportLog()">📤 Экспорт</button>
+    </div>
+    <div id="log">Пока нет сигналов...</div>
+    
+    <!-- Footer -->
+    <div class="footer">
+      ⚠️ Не является фин. рекомендацией • Риск 1-2% на сделку • БОТ СТЕПАНА
+    </div>
+  </div>
+  
+  <!-- Install Banner -->
+  <div class="install-banner" id="installBanner">
+    <span>📲 Установить приложение?</span>
+    <button onclick="installApp()">Установить</button>
+    <button class="close" onclick="hideInstallBanner()">✕</button>
+  </div>
+
+  <script>
+    // ========================================
+    // 📱 PWA & Mobile Optimizations
+    // ========================================
+    
+    // Регистрация Service Worker (для офлайн-работы)
+    if ('serviceWorker' in navigator) {
+      // Минимальный SW для кэширования
+      const swCode = `
+        self.addEventListener('install', e => {
+          self.skipWaiting();
+        });
+        self.addEventListener('fetch', e => {
+          // Стратегия: network first, fallback to cache
+          e.respondWith(
+            fetch(e.request).catch(() => caches.match(e.request))
+          );
+        });
+      `;
+      const blob = new Blob([swCode], {type: 'application/javascript'});
+      const swUrl = URL.createObjectURL(blob);
+      navigator.serviceWorker.register(swUrl).catch(() => {});
+    }
+    
+    // Предотвращение зума и скролла по всей странице
+    document.addEventListener('touchmove', e => {
+      if (e.target.id !== 'log') e.preventDefault();
+    }, { passive: false });
+    
+    // ========================================
+    // 🎨 Chart Initialization
+    // ========================================
+    const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+      layout: { background: { color: '#151a21' }, textColor: '#c5ccd5' },
+      grid: { vertLines: { color: '#2a313a' }, horzLines: { color: '#2a313a' } },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal, vertLine: { visible: false }, horzLine: { visible: false } },
+      timeScale: { 
+        borderColor: '#2a313a', 
+        timeVisible: true, 
+        secondsVisible: false,
+        fixLeftEdge: true,
+        fixRightEdge: true
+      },
+      rightPriceScale: { borderColor: '#2a313a', autoScale: true },
+      handleScroll: { vertTouchDrag: false, mouseWheel: false },
+      handleScale: { axisPressedMouseMove: false, mouseWheel: false, pinch: true }
+    });
+    
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: '#00c853', downColor: '#ff3d00', borderVisible: false, 
+      wickUpColor: '#00c853', wickDownColor: '#ff3d00'
+    });
+    const ema9Line = chart.addLineSeries({ color: '#ffd600', lineWidth: 2, crosshairMarkerVisible: false });
+    const ema21Line = chart.addLineSeries({ color: '#2979ff', lineWidth: 2, crosshairMarkerVisible: false });
+    
+    // Адаптация графика под размер экрана
+    function resizeChart() {
+      chart.applyOptions({ 
+        width: document.getElementById('chart').clientWidth,
+        height: document.getElementById('chart').clientHeight 
+      });
+    }
+    window.addEventListener('resize', resizeChart);
+    setTimeout(resizeChart, 100);
+    
+    // ========================================
+    // 🔧 State & Settings
+    // ========================================
+    let ws = null;
+    let closes = [];
+    let lastSignal = null;
+    let signalCooldown = false;
+    let audioCtx = null;
+    let soundEnabled = false;
+    let deferredPrompt = null;
+    
+    // ========================================
+    // 🔊 Audio & Vibration
+    // ========================================
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+    
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundBtn');
+      btn.textContent = soundEnabled ? '🔔 Звук: ВКЛ' : '🔔 Звук';
+      btn.classList.toggle('active', soundEnabled);
+      if (soundEnabled) initAudio();
+    }
+    
+    function triggerAlert(type) {
+      // Вибрация (только мобильные)
+      if (navigator.vibrate) {
+        navigator.vibrate([150, 50, 150, 50, 300]);
+      }
+      // Звук
+      if (soundEnabled && audioCtx) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.value = type === 'LONG' ? 880 : 440;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      }
+      // Уведомление (если разрешено)
+      if (Notification.permission === 'granted') {
+        new Notification(`🚀 ${type} BTC/USDT`, {
+          body: `Вход: ${document.getElementById('entry').textContent}`,
+          icon: '📈'
+        });
+      }
+    }
+    
+    // ========================================
+    // 📐 Indicators Math
+    // ========================================
+    function calcEMA(data, period) {
+      if (data.length < period) return null;
+      let k = 2 / (period + 1);
+      let ema = data.slice(0, period).reduce((a, b) => a + b) / period;
+      for (let i = period; i < data.length; i++) ema = data[i] * k + ema * (1 - k);
+      return ema;
+    }
+    
+    function calcRSI(data, period) {
+      if (data.length < period + 1) return null;
+      let gains = 0, losses = 0;
+      for (let i = 1; i <= period; i++) {
+        const diff = data[i] - data[i-1];
+        if (diff >= 0) gains += diff; else losses -= diff;
+      }
+      let avgGain = gains / period, avgLoss = losses / period;
+      for (let i = period + 1; i < data.length; i++) {
+        const diff = data[i] - data[i-1];
+        avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period;
+        avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period;
+      }
+      return avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+    }
+    
+    // ========================================
+    // 🌐 Data Loading
+    // ========================================
+    async function loadHistory() {
+      try {
+        const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=200');
+        if (!res.ok) throw new Error('API error');
+        const klines = await res.json();
+        
+        closes = klines.map(k => parseFloat(k[4]));
+        const candles = klines.map(k => ({
+          time: k[0] / 1000,
+          open: parseFloat(k[1]), high: parseFloat(k[2]), 
+          low: parseFloat(k[3]), close: parseFloat(k[4])
+        }));
+        
+        candleSeries.setData(candles);
+        
+        // EMA lines
+        const ema9Data = [], ema21Data = [];
+        for (let i = 0; i < closes.length; i++) {
+          const e9 = calcEMA(closes.slice(0, i+1), 9);
+          const e21 = calcEMA(closes.slice(0, i+1), 21);
+          if (e9) ema9Data.push({ time: candles[i].time, value: e9 });
+          if (e21) ema21Data.push({ time: candles[i].time, value: e21 });
+        }
+        ema9Line.setData(ema9Data);
+        ema21Line.setData(ema21Data);
+        
+        chart.timeScale().fitContent();
+        document.getElementById('status').textContent = '🟢 Онлайн';
+        document.getElementById('price').textContent = `$${candles[candles.length-1].close.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        
+        connectWS();
+      } catch (e) {
+        document.getElementById('status').textContent = '❌ Ошибка';
+        setTimeout(loadHistory, 5000);
+      }
+    }
+    
+    // ========================================
+    // 📡 WebSocket (Real-time)
+    // ========================================
+    function connectWS() {
+      if (ws) ws.close();
+      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_5m');
+      
+      ws.onopen = () => document.getElementById('status').textContent = '🟢 Онлайн';
+      
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        const k = msg.k;
+        const candle = {
+          time: k.t / 1000,
+          open: parseFloat(k.o), high: parseFloat(k.h),
+          low: parseFloat(k.l), close: parseFloat(k.c)
+        };
+        
+        candleSeries.update(candle);
+        document.getElementById('price').textContent = `$${candle.close.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        document.getElementById('price').className = `price-box ${candle.close >= candle.open ? 'price-up' : 'price-down'}`;
+        
+        if (k.x) { // Candle closed
+          closes.push(candle.close);
+          if (closes.length > 200) closes.shift();
+          updateIndicators();
+          checkSignal(candle.close, candle.time);
+        } else {
+          // Update EMA visually during candle formation
+          const em9 = calcEMA(closes, 9);
+          const em21 = calcEMA(closes, 21);
+          if (em9) ema9Line.update({ time: candle.time, value: em9 });
+          if (em21) ema21Line.update({ time: candle.time, value: em21 });
+        }
+      };
+      
+      ws.onclose = () => setTimeout(connectWS, 3000);
+      ws.onerror = () => ws.close();
+    }
+    
+    function updateIndicators() {
+      const em9 = calcEMA(closes, 9);
+      const em21 = calcEMA(closes, 21);
+      const rsi = calcRSI(closes, 14);
+      document.getElementById('ema9').textContent = em9 ? em9.toFixed(2) : '—';
+      document.getElementById('ema21').textContent = em21 ? em21.toFixed(2) : '—';
+      document.getElementById('rsi').textContent = rsi ? rsi.toFixed(1) : '—';
+    }
+    
+    // ========================================
+    // 🎯 Signal Logic
+    // ========================================
+    function checkSignal(price, time) {
+      if (closes.length < 25 || signalCooldown) return;
+      
+      const em9 = calcEMA(closes, 9);
+      const em21 = calcEMA(closes, 21);
+      const prevEm9 = calcEMA(closes.slice(0, -1), 9);
+      const prevEm21 = calcEMA(closes.slice(0, -1), 21);
+      const rsi = calcRSI(closes, 14);
+      
+      if (!em9 || !em21 || !prevEm9 || !prevEm21 || !rsi) return;
+      
+      let signal = null;
+      if (prevEm9 <= prevEm21 && em9 > em21 && rsi < 70) signal = 'LONG';
+      if (prevEm9 >= prevEm21 && em9 < em21 && rsi > 30) signal = 'SHORT';
+      
+      if (signal && lastSignal !== signal) {
+        lastSignal = signal;
+        signalCooldown = true;
+        setTimeout(() => signalCooldown = false, 60000);
+        
+        const entry = price;
+        const sl = signal === 'LONG' ? entry - (entry * 0.0035) : entry + (entry * 0.0035);
+        const tp = signal === 'LONG' ? entry + (entry * 0.007) : entry - (entry * 0.007);
+        
+        // Update UI
+        const box = document.getElementById('signalBox');
+        box.textContent = `🚀 ${signal} СИГНАЛ!`;
+        box.className = `signal-box ${signal}`;
+        
+        document.getElementById('entry').textContent = `$${entry.toLocaleString()}`;
+        document.getElementById('sl').textContent = `$${sl.toLocaleString()}`;
+        document.getElementById('tp').textContent = `$${tp.toLocaleString()}`;
+        
+        // Marker on chart
+        const marker = {
+          time: time,
+          position: signal === 'LONG' ? 'belowBar' : 'aboveBar',
+          color: signal === 'LONG' ? '#00c853' : '#ff3d00',
+          shape: signal === 'LONG' ? 'arrowUp' : 'arrowDown',
+          text: signal
+        };
+        candleSeries.setMarkers([...(candleSeries.markers() || []), marker]);
+        
+        // Alert!
+        triggerAlert(signal);
+        addLog(signal, entry, sl, tp, new Date().toLocaleTimeString());
+        
+      } else if (lastSignal && ((lastSignal === 'LONG' && em9 < em21) || (lastSignal === 'SHORT' && em9 > em21))) {
+        // Reset signal
+        lastSignal = null;
+        document.getElementById('signalBox').textContent = '🟡 ОЖИДАНИЕ';
+        document.getElementById('signalBox').className = 'signal-box WAIT';
+        document.getElementById('entry').textContent = '—';
+        document.getElementById('sl').textContent = '—';
+        document.getElementById('tp').textContent = '—';
+      }
+    }
+    
+    // ========================================
+    // 📜 Log Functions
+    // ========================================
+    function addLog(type, entry, sl, tp, time) {
+      const log = document.getElementById('log');
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      div.innerHTML = `
+        <span class="log-signal">${type}</span> @ $${entry.toFixed(0)}<br>
+        <span class="log-details">SL: $${sl.toFixed(0)} • TP: $${tp.toFixed(0)}</span><br>
+        <span class="log-details" style="color:#666">${time}</span>
+      `;
+      log.prepend(div);
+      if (log.children.length > 15) log.lastChild.remove();
+    }
+    
+    function clearLog() {
+      document.getElementById('log').innerHTML = 'Журнал очищен';
+    }
+    
+    function exportLog() {
+      const entries = document.querySelectorAll('#log .log-entry');
+      let text = 'BTC Signal Bot Log\n' + '='.repeat(30) + '\n\n';
+      entries.forEach(el => text += el.textContent + '\n\n');
+      
+      const blob = new Blob([text], {type: 'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `btc-log-${new Date().toISOString().slice(0,10)}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    // ========================================
+    // 📲 PWA Install Logic
+    // ========================================
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('installBtn').style.display = 'block';
+      document.getElementById('installBanner').classList.add('show');
+    });
+    
+    function hideInstallBanner() {
+      document.getElementById('installBanner').classList.remove('show');
+    }
+    
+    async function installApp() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        document.getElementById('installBtn').style.display = 'none';
+        hideInstallBanner();
+      }
+      deferredPrompt = null;
+    }
+    
+    // Запрос разрешения на уведомления
+    if ('Notification' in window && Notification.permission === 'default') {
+      document.addEventListener('click', () => Notification.requestPermission(), {once: true});
+    }
+    
+    // ========================================
+    // 🚀 App Launch
+    // ========================================
+    (async () => {
+      // Активация аудио по первому касанию
+      document.addEventListener('touchstart', initAudio, {once: true});
+      document.addEventListener('click', initAudio, {once: true});
+      
+      await loadHistory();
+    })();
+  </script>
+</body>
+</html>
